@@ -1,7 +1,7 @@
 // Tek ayar dosyası. Üretim aracı (uret.py) bu dosyayı okul.json'dan yazar; elle değiştirme.
 window.OGR_AYAR = {
   UC: "https://script.google.com/macros/s/AKfycbyBqfw33ttt1PrQhgqG9uUWY63oxHSqtu0mIcD8QrMmC7o33iiLqjmRPFQpuZqevPbkLA/exec",
-  SURUM: "0.16.9",
+  SURUM: "0.17.0",
   OKUL_ADI: "Şehit Ramazan Meşe İmam Hatip Ortaokulu",
   UYGULAMA_ADI: "Meşe Öğretmen",
   KISA_AD: "Meşe Öğretmen",
