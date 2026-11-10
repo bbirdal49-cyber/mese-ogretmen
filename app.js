@@ -132,6 +132,7 @@
       var g = gc.liste[i], gd = g ? dersListe(g.ders) : [];
       if (g && Array.isArray(g.tarihler) && gd.length === ders.length && g.tarihler.some(function (t) { return kapsar(t, ds); })) { ders = gd; o.gecici = String(g.ad || 'Geçici düzen'); break; }
     }
+    var gdn = (r.gunTipi && r.gunTipi.gunDers) ? Math.floor(+r.gunTipi.gunDers[wd]) : 0; if (gdn >= 1 && gdn < ders.length) ders = ders.slice(0, gdn);
     if (yarim) { var lim = yd || (r.gunTipi && Math.floor(+r.gunTipi.yarimGunDers) >= 1 && Math.floor(+r.gunTipi.yarimGunDers)) || 3; ders = ders.slice(0, Math.min(ders.length, lim)); o.yarim = true; }
     o.ders = ders; return o;
   }
@@ -723,10 +724,15 @@
     if (!l && nb.tarih === ds && Array.isArray(nb.liste)) l = nb.liste;
     return (l || []).filter(function (k) { return k && typeof k.ad === 'string' && k.ad; });
   }
+  function nobGrupla(l) { if (!l.some(function (k) { return k.v === 'o'; })) return l; var s = l.filter(function (k) { return k.v !== 'o'; }), o = l.filter(function (k) { return k.v === 'o'; }), r = []; if (s.length) { r.push({ __b: 'Sabah' }); r = r.concat(s); } r.push({ __b: 'Öğle' }); return r.concat(o); }
+  function nobSirala(l) { if (!l.some(function (k) { return k && k.v === 'o'; })) return l; return l.filter(function (k) { return k.v !== 'o'; }).concat(l.filter(function (k) { return k.v === 'o'; })); }
+  function nobEt(k, l) { var yer = k.yer || '·'; return l.some(function (x) { return x && x.v === 'o'; }) ? [yer, k.v === 'o' ? 'Öğle' : 'Sabah'] : yer; }
   function sNobetci(C) {
     var nbl = nobetListe(C.y, C.gb.ds);
     if (!nbl.length || C.gb.tip !== 'ders') return '';
-    return '<div class="sec" data-k="nobet">' + secH('Bugün nöbetçi', nbl.length + ' kişi') + '<div class="rows">' + nbl.map(function (k, ki) {
+    return '<div class="sec" data-k="nobet">' + secH('Bugün nöbetçi', nbl.length + ' kişi') + '<div class="rows">' + nobGrupla(nbl).map(function (k) {
+      if (k.__b) return '<div style="font-size:11px;font-weight:700;opacity:.7;padding:8px 2px 2px;">' + esc(k.__b) + '</div>';
+      var ki = nbl.indexOf(k);
       return '<div class="rw' + (C.ben && norm(k.ad) === C.ben ? ' me' : '') + '" data-dt="nb:' + ki + '"><div class="a"><b>' + esc(k.ad) + '</b></div><span class="z">' + esc(k.yer || '') + '</span></div>';
     }).join('') + '</div><div class="paysat">' + payBtn('nobg', 'Günlük liste resmi') + (nobHafta(C).length > 1 ? payBtn('nobh', 'Haftalık liste resmi') : '') + '</div></div>';
   }
@@ -1821,11 +1827,11 @@
       dosya = 'ders-programim.png';
     } else if (tip === 'nobg') {
       var l = nobetListe(y, C.gb.ds); if (!l.length) return;
-      o = { baslik: 'Günlük nöbet listesi', alt: GUN[C.d.getDay()] + ', ' + gunAy(C.gb.ds), sut: ['Nöbetçi öğretmen', 'Nöbet yeri'], w: [1.3, 1], solHiza: true, rh: 78, sat: l.map(function (k) { return [k.ad, k.yer || '·']; }) };
+      o = { baslik: 'Günlük nöbet listesi', alt: GUN[C.d.getDay()] + ', ' + gunAy(C.gb.ds), sut: ['Nöbetçi öğretmen', 'Nöbet yeri'], w: [1.3, 1], solHiza: true, rh: 78, sat: nobSirala(l).map(function (k) { return [k.ad, nobEt(k, l)]; }) };
       dosya = 'nobet-' + C.gb.ds + '.png';
     } else if (tip === 'nobh') {
       var gl = nobHafta(C); if (!gl.length) return; var sat = [];
-      gl.forEach(function (g) { var dd = tarihCoz(g.tarih), ls = g.liste.filter(function (k) { return k && typeof k.ad === 'string' && k.ad; }); ls.forEach(function (k, q) { sat.push([q === 0 ? [GUN[dd.getDay()], gunAy(g.tarih)] : '', k.ad, k.yer || '·']); }); });
+      gl.forEach(function (g) { var dd = tarihCoz(g.tarih), ls = nobSirala(g.liste.filter(function (k) { return k && typeof k.ad === 'string' && k.ad; })); ls.forEach(function (k, q) { sat.push([q === 0 ? [GUN[dd.getDay()], gunAy(g.tarih)] : '', k.ad, nobEt(k, ls)]); }); });
       o = { baslik: 'Haftalık nöbet çizelgesi', alt: gunAy(gl[0].tarih) + ' – ' + gunAy(gl[gl.length - 1].tarih), sut: ['Gün', 'Nöbetçi öğretmen', 'Nöbet yeri'], w: [1, 1.5, 1.1], solHiza: true, rh: 80, sat: sat };
       dosya = 'nobet-hafta-' + gl[0].tarih + '.png';
     } else return;
@@ -2680,7 +2686,7 @@ function skLocal(now){ const t=new Date(now.getTime()+SK_TZ*3600000); return {y:
 
   // ================= KAZANIMLAR (MEB yıllık planı; uygulamayla birlikte gelen statik dosyalar, öğretmenin cihazında okunur) =================
   var KZ = { idx: null, dos: {}, cur: null, sel: -1, bekle: {} };
-  var KZ_ANAH = { mat: 'mat', matematik: 'mat', turkce: 'tur', fen: 'fen', fenbilimleri: 'fen', ing: 'ing', ingilizce: 'ing', sosyal: 'sos', sosyalbilgiler: 'sos', inklap: 'ita', inkilap: 'ita', ita: 'ita', dink: 'dkab', dkab: 'dkab', muzik: 'muz', bedegt: 'bes', bedenegitimi: 'bes', resim: 'gs', gorselsanatlar: 'gs', tektsr: 'tt', tektas: 'tt', teknolojitasarim: 'tt', blsm: 'bty', bilisim: 'bty', dinkulturu: 'dkab', dinkulturuveahlakbilgisi: 'dkab', teknolojivetasarim: 'tt', bilisimteknolojileri: 'bty', bilisimteknolojilerivezilim: 'bty', tcinkilaptarihi: 'ita', inkilaptarihi: 'ita', inkilaptarihivataturkculuk: 'ita', inkilaptarihiveataturkculuk: 'ita', gorselsanat: 'gs', afets: 'afet', afetbilinci: 'afet', ahlks: 'ahlk', ahlakvevatandaslik: 'ahlk', cevres: 'cevre', cevreegitimi: 'cevre',
+  var KZ_ANAH = { mat: 'mat', matematik: 'mat', turkce: 'tur', fen: 'fen', fenbilimleri: 'fen', ing: 'ing', ingilizce: 'ing', sosyal: 'sos', sosyalbilgiler: 'sos', inklap: 'ita', inkilap: 'ita', ita: 'ita', dink: 'dkab', dkab: 'dkab', muzik: 'muz', bedegt: 'bes', bedenegitimi: 'bes', resim: 'gs', gorselsanatlar: 'gs', tektsr: 'tt', tektas: 'tt', teknolojitasarim: 'tt', blsm: 'bty', bilisim: 'bty', dinkulturu: 'dkab', dinkulturuveahlakbilgisi: 'dkab', teknolojivetasarim: 'tt', bilisimteknolojileri: 'bty', bilisimteknolojilerivezilim: 'bty', bilisimteknolojileriveyazilim: 'bty', bilisimtekveyazilim: 'bty', bilisimtekyazilim: 'bty', bedenegitimivespor: 'bes', bedenegitimispor: 'bes', tcinkilaptarihiveataturkculuk: 'ita', tcinkilaptarihiveataturkculugu: 'ita', secmeliingilizce: 'yabdil', arapca: 'arap', arapcas: 'arap', kuran: 'kuran', kuranikerim: 'kuran', secmelikuranikerim: 'kuran', peygamberimizinhayati: 'ph', temeldinibilgiler: 'tdb', temeldinibilgilerislam12: 'tdb', medyaokuryazarligi: 'medya', yazarlikveyazmabecerileri: 'yazar', yazarlikveyazma: 'yazar', secmeliyabancidil: 'yabdil', tcinkilaptarihi: 'ita', inkilaptarihi: 'ita', inkilaptarihivataturkculuk: 'ita', inkilaptarihiveataturkculuk: 'ita', gorselsanat: 'gs', afets: 'afet', afetbilinci: 'afet', ahlks: 'ahlk', ahlakvevatandaslik: 'ahlk', cevres: 'cevre', cevreegitimi: 'cevre',
     gkn: 'gkn', gkns: 'gkn', gorgukurallarivenezaket: 'gkn', kultmed: 'kultmed', kultmeds: 'kultmed', kulturmed: 'kultmed', kulturmeds: 'kultmed', kulturvemedeniyetimizeyonverenler: 'kultmed',
     spor: 'spor', spors: 'spor', sporvefizikietkinlikler: 'spor', yabdil: 'yabdil', yabdils: 'yabdil', yabancidil: 'yabdil', yabancidils: 'yabdil',
     reh: 'reh', rehberlik: 'reh', rehberlikveyonlendirme: 'reh', rehberlikvekariyerplanlama: 'reh' };
@@ -2696,6 +2702,7 @@ function skLocal(now){ const t=new Date(now.getTime()+SK_TZ*3600000); return {y:
   var KZ_DOSYA = { afet: 'afet1.json', ahlk: 'ahlk1.json', cevre: 'cevre8.json' };
   // index.json'da kaydı olmayan yeni seçmeli planlar (index'teki kayıt her zaman önceliklidir)
   var KZ_EK = [
+    { a: 'gkn', ad: 'Görgü Kuralları ve Nezaket', s: 7, f: 'gkn2.json', h: 34 },
     { a: 'gkn', ad: 'Görgü Kuralları ve Nezaket', s: 5, f: 'gkn1.json', h: 34 },
     { a: 'gkn', ad: 'Görgü Kuralları ve Nezaket', s: 6, f: 'gkn2.json', h: 34 },
     { a: 'gkn', ad: 'Görgü Kuralları ve Nezaket', s: 8, f: 'gkn1.json', h: 34 },
